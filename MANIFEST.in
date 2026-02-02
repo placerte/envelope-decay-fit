@@ -1,0 +1,32 @@
+# Include important files
+include README.md
+include LICENSE
+include AGENTS.md
+include pyproject.toml
+
+# Include documentation
+recursive-include docs *.md
+
+# Exclude data files (too large for package distribution)
+exclude data/
+recursive-exclude data *
+
+# Exclude examples data
+exclude examples/
+recursive-exclude examples *
+
+# Exclude development scripts
+exclude scripts/
+recursive-exclude scripts *
+
+# Exclude tests from distribution
+exclude tests/
+recursive-exclude tests *
+
+# Exclude output directories
+exclude out/
+recursive-exclude out *
+
+# Exclude git files
+exclude .git*
+exclude .python-version
