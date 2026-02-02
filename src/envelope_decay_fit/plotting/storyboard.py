@@ -4,16 +4,20 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.axes import Axes
+from matplotlib.figure import Figure
+from typing import cast
 
-from .plotting import export_plot
-from .result import Result
+from .plot_export import export_plot
+from ..models import FitResult
+from ..result import Result
 
 
 def create_diagnostic_plots(result: Result, out_dir: Path) -> dict[str, Path]:
     """Create diagnostic plots for fit results.
 
     Args:
-        result: Result object from fit_envelope_decay()
+        result: Result object from the auto pipeline
         out_dir: directory to write plots
 
     Returns:
@@ -43,6 +47,70 @@ def create_diagnostic_plots(result: Result, out_dir: Path) -> dict[str, Path]:
     paths["segmentation_storyboard"] = path
 
     return paths
+
+
+def plot_segmentation_storyboard(
+    t: np.ndarray,
+    env: np.ndarray,
+    fit: FitResult,
+    *,
+    ax: Axes | None = None,
+    yscale: str = "linear",
+) -> Figure:
+    """Plot envelope data with piecewise exponential fits.
+
+    Args:
+        t: time array (seconds)
+        env: envelope amplitude
+        fit: FitResult from the public API
+        ax: optional matplotlib Axes to draw on
+        yscale: "linear" or "log"
+
+    Returns:
+        Matplotlib Figure containing the plot
+    """
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(12, 6))
+    else:
+        fig = cast(Figure, ax.figure)
+
+    ax.plot(t, env, "k-", alpha=0.5, linewidth=1, label="Envelope data")
+
+    colors = ["blue", "green", "red", "orange", "purple"]
+    for idx, piece in enumerate(fit.pieces):
+        params = piece.params
+        if "A0" not in params or "alpha" not in params:
+            continue
+
+        mask = (t >= piece.t_start_s) & (t <= piece.t_end_s)
+        t_piece = t[mask]
+        if len(t_piece) == 0:
+            continue
+
+        t_shifted = t_piece - piece.t_start_s
+        env_fit = params["A0"] * np.exp(-params["alpha"] * t_shifted)
+
+        color = colors[idx % len(colors)]
+        ax.plot(
+            t_piece,
+            env_fit,
+            "--",
+            color=color,
+            linewidth=2,
+            label=f"Piece {piece.piece_id}: ζ={params.get('zeta', 0.0):.4f}",
+        )
+
+    ax.set_xlabel("Time (s)")
+    ax.set_ylabel("Envelope amplitude")
+    ax.set_title("Segmentation Storyboard")
+    ax.grid(True, alpha=0.3)
+    if yscale == "log":
+        ax.set_yscale("log", nonpositive="clip")
+    else:
+        ax.set_yscale("linear")
+    ax.legend(fontsize=8, loc="upper right")
+
+    return fig
 
 
 def create_piecewise_fit_plot(result: Result, out_path: Path) -> Path:
@@ -143,7 +211,7 @@ def create_piecewise_fit_plot(result: Result, out_path: Path) -> Path:
 
 def create_score_traces_plot(result: Result, out_path: Path) -> Path:
     """Create R² score traces plot."""
-    from .windows import WindowFitRecord, extract_score_trace
+    from ..segmentation.auto.window_scan import WindowFitRecord, extract_score_trace
 
     fig, ax = plt.subplots(figsize=(12, 6))
 
@@ -244,7 +312,7 @@ def create_score_traces_plot(result: Result, out_path: Path) -> Path:
 
 def create_param_traces_plot(result: Result, out_path: Path) -> Path:
     """Create parameter traces plot (ζ vs Δt)."""
-    from .windows import extract_param_trace
+    from ..segmentation.auto.window_scan import extract_param_trace
 
     fig, axes = plt.subplots(2, 1, figsize=(12, 8))
 
@@ -323,7 +391,7 @@ def create_param_traces_plot(result: Result, out_path: Path) -> Path:
 
 def create_segmentation_storyboard_plot(result: Result, out_path: Path) -> Path:
     """Create segmentation storyboard plot (R² in global time)."""
-    from .windows import WindowFitRecord
+    from ..segmentation.auto.window_scan import WindowFitRecord
 
     fig, ax = plt.subplots(figsize=(12, 6))
 

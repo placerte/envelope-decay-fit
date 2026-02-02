@@ -1,12 +1,18 @@
 """Result dataclasses for API return values."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
-import numpy as np
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+import numpy as np
 
 from .flags import FlagRecord
-from .windows import WindowFitRecord
 from .fitters import FitResult
+
+if TYPE_CHECKING:
+    from .segmentation.auto.window_scan import WindowFitRecord
 
 
 @dataclass
@@ -50,7 +56,7 @@ class PieceRecord:
 
 @dataclass
 class Result:
-    """Top-level result object returned by fit_envelope_decay().
+    """Top-level result object returned by internal pipelines.
 
     Attributes:
         t: input time array (seconds)
@@ -76,7 +82,7 @@ class Result:
 
     # Results
     pieces: list[PieceRecord]
-    windows_trace: list[WindowFitRecord]
+    windows_trace: list["WindowFitRecord"]
     flags: list[FlagRecord]
 
     # Optional output paths

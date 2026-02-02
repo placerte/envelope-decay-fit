@@ -60,6 +60,7 @@ exclude = [
     "data/",
     "examples/",
     "scripts/",
+    "validation/",
     "out/",
     ".git*",
 ]

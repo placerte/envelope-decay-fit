@@ -9,9 +9,17 @@ import json
 import numpy as np
 from matplotlib.backend_bases import Event
 
-from .fitters import fit_log_domain, fit_lin0_domain, fit_linc_domain, FitResult
-from .flags import FlagRecord
-from .result import PieceRecord, Result
+from ..fitters import fit_log_domain, fit_lin0_domain, fit_linc_domain, FitResult
+from ..flags import FlagRecord
+from ..result import PieceRecord, Result
+
+
+@dataclass
+class ManualUIConfig:
+    """Configuration for the manual segmentation UI."""
+
+    min_points: int = 10
+    out_dir: Path | None = None
 
 
 def find_nearest_index(t: np.ndarray, x_value: float) -> int:
@@ -216,6 +224,7 @@ class ManualSegmentationUI:
     fn_hz: float
     min_points: int = 10
     out_dir: Path | None = None
+    initial_boundaries_time_s: list[float] = field(default_factory=list)
 
     boundary_order: list[int] = field(default_factory=list)
     boundary_indices: list[int] = field(default_factory=list)
@@ -232,6 +241,14 @@ class ManualSegmentationUI:
         """Launch the interactive session and return a Result if committed."""
         import matplotlib.pyplot as plt
         from matplotlib.lines import Line2D
+
+        if self.initial_boundaries_time_s:
+            initial_indices = snap_boundary_times_to_indices(
+                self.t, self.initial_boundaries_time_s
+            )
+            self.boundary_order = list(initial_indices)
+            self._rebuild_boundaries()
+            self.last_action = "Loaded initial boundaries"
 
         self.fig, self.ax = plt.subplots(figsize=(12, 6))
         self.ax.plot(self.t, self.env, "k-", alpha=0.6, linewidth=1)
@@ -554,6 +571,7 @@ def run_manual_segmentation(
     fn_hz: float,
     min_points: int = 10,
     out_dir: Path | str | None = None,
+    initial_boundaries_time_s: list[float] | None = None,
 ) -> Result | None:
     """Run the interactive manual segmentation workflow."""
     out_path = Path(out_dir) if out_dir is not None else None
@@ -563,5 +581,6 @@ def run_manual_segmentation(
         fn_hz=fn_hz,
         min_points=min_points,
         out_dir=out_path,
+        initial_boundaries_time_s=initial_boundaries_time_s or [],
     )
     return ui.run()

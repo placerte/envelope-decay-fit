@@ -9,10 +9,10 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from envelope_decay_fit.windows import (
-    generate_expanding_windows,
-    extract_score_trace,
+from envelope_decay_fit.segmentation.auto.window_scan import (
     extract_param_trace,
+    extract_score_trace,
+    generate_expanding_windows,
 )
 from envelope_decay_fit.plotting import export_plot
 

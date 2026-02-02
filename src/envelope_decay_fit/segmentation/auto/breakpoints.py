@@ -4,7 +4,7 @@ import numpy as np
 from scipy.ndimage import uniform_filter1d
 from typing import Optional
 
-from .flags import FlagRecord
+from ...flags import FlagRecord
 
 
 def smooth_trace(

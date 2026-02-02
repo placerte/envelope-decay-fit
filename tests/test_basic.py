@@ -3,18 +3,23 @@
 import numpy as np
 import pytest
 
-from envelope_decay_fit import fit_envelope_decay
-from envelope_decay_fit.fitters import fit_log_domain, fit_lin0_domain, fit_linc_domain
+from envelope_decay_fit import fit_piecewise_manual
+from envelope_decay_fit.fitters import fit_log_domain
 
 
 def test_import():
     """Test that package imports correctly."""
-    from envelope_decay_fit import fit_envelope_decay, Result, PieceRecord, FlagRecord
+    from envelope_decay_fit import (
+        FitResult,
+        PieceFit,
+        fit_piecewise_manual,
+        launch_manual_segmentation_ui,
+    )
 
-    assert fit_envelope_decay is not None
-    assert Result is not None
-    assert PieceRecord is not None
-    assert FlagRecord is not None
+    assert FitResult is not None
+    assert PieceFit is not None
+    assert fit_piecewise_manual is not None
+    assert launch_manual_segmentation_ui is not None
 
 
 def test_log_fitter_simple():
@@ -37,8 +42,8 @@ def test_log_fitter_simple():
     assert result.r2 > 0.99
 
 
-def test_fit_envelope_decay_synthetic():
-    """Test full pipeline on synthetic data."""
+def test_fit_piecewise_manual_synthetic():
+    """Test manual pipeline on synthetic data."""
     # Generate piecewise decay
     t1 = np.linspace(0, 0.5, 500)
     t2 = np.linspace(0.500001, 1.5, 1000)  # Avoid duplicate at boundary
@@ -57,16 +62,13 @@ def test_fit_envelope_decay_synthetic():
 
     fn_hz = 150.0
 
-    # Fit
-    result = fit_envelope_decay(t, env, fn_hz, n_pieces=2, max_windows=100)
+    breakpoints_t = [float(t[0]), float(t1[-1]), float(t[-1])]
 
-    assert len(result.pieces) == 2
-    assert result.pieces[0].label == "established_free_decay"
-    assert result.pieces[1].label == "transient_dominated_decay"
+    fit = fit_piecewise_manual(t, env, breakpoints_t, fn_hz=fn_hz)
 
-    # Check that pieces were extracted
-    assert result.pieces[0].n_points > 0
-    assert result.pieces[1].n_points > 0
+    assert len(fit.pieces) == 2
+    assert fit.pieces[0].n_points > 0
+    assert fit.pieces[1].n_points > 0
 
 
 def test_invalid_inputs():
@@ -76,7 +78,7 @@ def test_invalid_inputs():
     env = np.ones(100)  # Different length
 
     with pytest.raises(ValueError, match="same length"):
-        fit_envelope_decay(t, env, fn_hz=100.0)
+        fit_piecewise_manual(t, env, [0.0, 1.0], fn_hz=100.0)
 
     # Non-monotonic time (but enough samples)
     t = np.linspace(0, 1, 200)
@@ -84,14 +86,14 @@ def test_invalid_inputs():
     env = np.exp(-2 * t)
 
     with pytest.raises(ValueError, match="strictly increasing"):
-        fit_envelope_decay(t, env, fn_hz=100.0)
+        fit_piecewise_manual(t, env, [0.0, 1.0], fn_hz=100.0)
 
     # Too few samples
     t = np.linspace(0, 1, 50)
     env = np.exp(-2 * t)
 
-    with pytest.raises(ValueError, match="at least 100"):
-        fit_envelope_decay(t, env, fn_hz=100.0)
+    with pytest.raises(ValueError, match="at least 2"):
+        fit_piecewise_manual(t[:1], env[:1], [0.0, 1.0], fn_hz=100.0)
 
 
 def test_negative_envelope_warning():
@@ -101,28 +103,11 @@ def test_negative_envelope_warning():
     env[500] = -0.1  # Inject negative value
 
     fn_hz = 100.0
-    result = fit_envelope_decay(t, env, fn_hz, n_pieces=1, max_windows=50)
+    breakpoints_t = [float(t[0]), float(t[-1])]
+    fit = fit_piecewise_manual(t, env, breakpoints_t, fn_hz=fn_hz)
 
-    # Check that a warning flag was generated
-    warning_flags = [f for f in result.flags if f.code == "NEGATIVE_ENV_VALUES"]
+    assert fit.diagnostics is not None
+    warning_flags = [
+        f for f in fit.diagnostics.flags if f.code == "NEGATIVE_ENV_VALUES"
+    ]
     assert len(warning_flags) > 0
-
-
-if __name__ == "__main__":
-    # Run tests manually
-    test_import()
-    print("✓ test_import")
-
-    test_log_fitter_simple()
-    print("✓ test_log_fitter_simple")
-
-    test_fit_envelope_decay_synthetic()
-    print("✓ test_fit_envelope_decay_synthetic")
-
-    test_invalid_inputs()
-    print("✓ test_invalid_inputs")
-
-    test_negative_envelope_warning()
-    print("✓ test_negative_envelope_warning")
-
-    print("\nAll tests passed!")

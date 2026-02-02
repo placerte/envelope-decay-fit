@@ -21,7 +21,7 @@ The package is split into three conceptual layers:
 CLI (argparse)
    │
    ▼
-core.fit_envelope_decay()   ← pure computation, no I/O by default
+api.fit_piecewise_auto()    ← pure computation, no I/O by default (experimental)
    │
    ├── tail trimming
    ├── expanding-window fitting
@@ -57,20 +57,18 @@ envelope-decay-fit/
 ├── src/envelope_decay_fit/
 │   ├── __init__.py
 │   ├── api.py              # public API entrypoint
-│   ├── core.py             # main orchestration logic
-│   ├── config.py           # Config dataclass + defaults
-│   ├── tail_trim.py        # tail trimming logic
-│   ├── windows.py          # expanding-window generator
-│   ├── fitters.py          # LOG / LIN0 / LINC fits (SciPy)
-│   ├── breakpoint.py       # change-point detection
-│   ├── flags.py            # flag definitions + helpers
-│   ├── artifacts/
-│   │   ├── csv_writer.py
-│   │   ├── plots.py
-│   │   └── utils.py
+│   ├── models.py           # FitResult / PieceFit models
+│   ├── fitters/            # LOG / LIN0 / LINC fits (SciPy)
+│   ├── segmentation/
+│   │   ├── manual.py
+│   │   └── auto/            # experimental auto pipeline
+│   ├── plotting/
+│   ├── flags.py
+│   ├── result.py           # internal Result dataclasses
 │   └── cli.py              # argparse-based CLI
 ├── tests/
-└── examples/
+├── examples/
+└── validation/
 ```
 
 ---
@@ -98,15 +96,13 @@ Notes:
 ### Function entrypoint (locked)
 
 ```python
-from envelope_decay_fit.api import fit_envelope_decay
+from envelope_decay_fit.api import fit_piecewise_manual
 
-result = fit_envelope_decay(
+result = fit_piecewise_manual(
     t,
     env,
-    fn_hz,
-    n_pieces=2,
-    config=None,
-    out_dir=None,
+    breakpoints_t=[t[0], t[-1]],
+    fn_hz=fn_hz,
 )
 ```
 
@@ -115,9 +111,8 @@ Arguments:
 * `t: ndarray[float]` — time array (seconds, strictly increasing)
 * `env: ndarray[float]` — envelope amplitude (non-negative expected)
 * `fn_hz: float` — natural frequency in Hz (required)
-* `n_pieces: int` — requested number of decay pieces (default: 2)
-* `config: Config | None` — optional configuration override
-* `out_dir: Path | None` — if provided, write CSVs and plots
+* `breakpoints_t: list[float]` — manual boundary times (seconds)
+* `fn_hz: float` — natural frequency in Hz (required)
 
 Returns:
 
@@ -325,4 +320,3 @@ CLI responsibilities:
 * minimum cycles constraint (in addition to min points)
 * JSON / NPZ artifact export
 * tighter integration into `wav-to-freq`
-

@@ -27,7 +27,8 @@ Given a **time-domain envelope** `env(t)` (e.g. Hilbert envelope) and a known na
   * modal coupling,
   * noise-floor dominated tails,
 
-* automatically segments the response into **piecewise decay regions** (default: 2 pieces),
+* supports **manual, human-in-the-loop breakpoints** as the primary workflow,
+* keeps the automatic segmentation pipeline as experimental/secondary,
 
 * computes **multiple fits** per window (log-domain, linear w/ and w/o floor),
 
@@ -83,87 +84,55 @@ t_s,env
 ...
 ```
 
-### Basic example
+### Basic example (manual workflow)
+
+Default mode runs manual segmentation and then fits immediately:
 
 ```bash
-env-decay-fit input.csv \
-  --fn-hz 150.0
+env-decay-fit input.csv --fn-hz 150.0
 ```
 
-This will:
-
-* run the full piecewise decay analysis,
-* create an output directory:
-
-```
-./out/2026-01-27_161530/
-```
-
-* write CSV summaries and diagnostic plots.
-
-### Common options
+Explicit combined command (same behavior):
 
 ```bash
-env-decay-fit input.csv \
-  --fn-hz 150.0 \
-  --n-pieces 2 \
-  --out-dir ./out/test_run
+env-decay-fit segment-fit input.csv --fn-hz 150.0
 ```
 
-Key arguments:
-
-* `--fn-hz` *(required)*: natural frequency in Hz
-* `--n-pieces`: number of decay pieces to extract (default: 2)
-* `--out-dir`: output directory (default: `./out/<timestamp>/`)
-
-Run `env-decay-fit --help` for the full list.
-
-### Manual segmentation (interactive)
-
-Use the interactive Matplotlib workflow to select boundary points manually:
+Or run the steps separately:
 
 ```bash
-env-decay-fit input.csv \
-  --fn-hz 150.0 \
-  --manual-segmentation
+env-decay-fit segment input.csv --fn-hz 150.0 \
+  --breakpoints-out out/breakpoints.json
+
+env-decay-fit fit input.csv --fn-hz 150.0 \
+  --breakpoints-file out/breakpoints.json
 ```
 
-Controls:
+### Manual segmentation controls
 
-* Left click: add boundary point (snapped to nearest sample)
-* `c`: clear all points
-* `d`: delete nearest point to mouse
+The UI is keyboard-driven. Mouse movement updates the cursor position.
+
+* `a`: add boundary at cursor (snapped to nearest sample)
+* `x`: delete nearest boundary
+* `c`: clear all boundaries
 * `l`: toggle y-scale (lin/log)
-* `u`: undo last point
-* `enter`: commit and close
-* `q`: quit without saving
+* `h`: toggle help panel
+* `q`: quit and save current state
 
-Manual segmentation results are written to `manual_segmentation.json` in the output
-directory (if `--out-dir` is provided).
+### Other notes
+
+* The CLI writes outputs to `out/` by default.
+* Run `env-decay-fit --help` for the full list of options.
 
 ---
 
 ## Outputs
 
-When run via the CLI, the following artifacts are generated:
+The CLI writes to `out/` by default.
 
-### CSV files
-
-* `envelope.csv` — original input data
-* `windows_trace.csv` — all expanding-window fits ("print everything")
-* `pieces.csv` — extracted decay pieces and representative parameters
-* `flags.csv` — warnings, rejections, and diagnostics
-* `summary.csv` — single-row quick overview
-
-All CSVs use a **wide, spreadsheet-friendly format**.
-
-### Plots
-
-* `piecewise_fit.png` — envelope with piecewise fitted curves
-* `trace_scores.png` — R² vs window duration
-* `trace_params.png` — ζ (and floor C) vs window duration
-
-Plots include light annotation boxes with key values and flags.
+* `breakpoints.json` — manual breakpoints from the UI (segment command)
+* `fit_result.json` — piecewise fit summary (fit command)
+* `segmentation_storyboard.png` — envelope with fitted pieces
 
 ---
 
@@ -173,35 +142,30 @@ The core API performs **no file I/O by default** and returns a structured result
 
 ```python
 import numpy as np
-from envelope_decay_fit.api import fit_envelope_decay
+from envelope_decay_fit import (
+    fit_piecewise_manual,
+    launch_manual_segmentation_ui,
+    plot_segmentation_storyboard,
+)
 
-# t and env are numpy arrays
 t = np.array([...])
 env = np.array([...])
+fn_hz = 150.0
 
-result = fit_envelope_decay(
-    t,
-    env,
-    fn_hz=150.0,
-    n_pieces=2,
-)
+# Manual breakpoints supplied explicitly
+breakpoints_t = [t[0], t[-1]]
+fit = fit_piecewise_manual(t, env, breakpoints_t, fn_hz=fn_hz)
 
-# Access results
-result.pieces
-result.windows_trace
-result.flags
+# Optional interactive UI for breakpoint selection
+breakpoints_t = launch_manual_segmentation_ui(t, env, fn_hz=fn_hz)
+
+# Plotting (no file I/O unless you save the figure)
+fig = plot_segmentation_storyboard(t, env, fit)
+fig.savefig("out/storyboard.png", dpi=150)
 ```
 
-If you want artifacts written programmatically:
-
-```python
-result = fit_envelope_decay(
-    t,
-    env,
-    fn_hz=150.0,
-    out_dir="./out/run_001",
-)
-```
+Experimental auto segmentation is available as `fit_piecewise_auto(...)`, but it
+is intentionally not the default workflow.
 
 ---
 
@@ -214,6 +178,22 @@ result = fit_envelope_decay(
 * The tool never silently discards results: questionable regions are **flagged**, not hidden.
 
 See `specs.md` and `implementation.md` for full technical details.
+
+---
+
+## Testing and validation
+
+Unit tests live in `tests/` and are fast by default:
+
+```bash
+pytest -q
+```
+
+Slow, human-review workflows live under `validation/`:
+
+```bash
+uv run python validation/review_runner.py
+```
 
 ---
 

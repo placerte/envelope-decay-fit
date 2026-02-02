@@ -18,7 +18,7 @@ echo ""
 
 # Check package installation
 echo "3. Package installation:"
-python -c "from envelope_decay_fit import fit_envelope_decay; print('✓ Package imported successfully')"
+python -c "from envelope_decay_fit import fit_piecewise_manual; print('✓ Package imported successfully')"
 echo ""
 
 # Check CLI command
@@ -29,7 +29,7 @@ echo ""
 
 # Run tests
 echo "5. Running tests:"
-python tests/test_basic.py 2>&1 | grep -E "(✓|passed)"
+pytest -q
 echo ""
 
 # Check example data
@@ -39,12 +39,11 @@ echo ""
 
 # Test on one dataset
 echo "7. Quick test on real data:"
-env-decay-fit data/envelope_exports/free_plate_A3H1/hit_001.csv \
+env-decay-fit fit data/envelope_exports/free_plate_A3H1/hit_001.csv \
     --fn-hz 775.2 \
-    --n-pieces 2 \
-    --max-windows 100 \
+    --breakpoints "0.0,0.1,0.2" \
     --out-dir out/verification \
-    2>&1 | grep -E "(Loaded|Pieces extracted|Piece [0-9])"
+    2>&1 | grep -E "(Fit results saved|Storyboard plot)"
 echo ""
 
 echo "=================================================="

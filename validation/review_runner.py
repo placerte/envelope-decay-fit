@@ -3,8 +3,8 @@
 Run all repo examples / validation scripts and save outputs in a human-friendly folder.
 
 Usage:
-  uv run python scripts/run_all_examples.py
-  uv run python scripts/run_all_examples.py --skip-all-datasets
+  uv run python validation/review_runner.py
+  uv run python validation/review_runner.py --skip-all-datasets
 """
 
 from __future__ import annotations
@@ -67,7 +67,7 @@ def main() -> int:
     parser.add_argument(
         "--skip-all-datasets",
         action="store_true",
-        help="Skip scripts/test_all_datasets.py (can be slow/noisy).",
+        help="Skip validation/review_all_datasets.py (can be slow/noisy).",
     )
     args = parser.parse_args()
 
@@ -118,7 +118,7 @@ def main() -> int:
     # 2) Expanding windows diagnostic
     rc = run_step(
         name="02_test_windows",
-        cmd=[py, "scripts/test_windows.py"],
+        cmd=[py, "validation/bench_windows.py"],
         cwd=repo_root,
         out_dir=out_dir,
         env=env,
@@ -129,7 +129,7 @@ def main() -> int:
     # 3) Fitters sanity on one dataset
     rc = run_step(
         name="03_test_fitters",
-        cmd=[py, "scripts/test_fitters.py"],
+        cmd=[py, "validation/bench_fitters.py"],
         cwd=repo_root,
         out_dir=out_dir,
         env=env,
@@ -141,7 +141,7 @@ def main() -> int:
     if not args.skip_all_datasets:
         rc = run_step(
             name="04_test_all_datasets",
-            cmd=[py, "scripts/test_all_datasets.py"],
+            cmd=[py, "validation/review_all_datasets.py"],
             cwd=repo_root,
             out_dir=out_dir,
             env=env,
@@ -172,4 +172,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 import numpy as np
 from typing import Iterator
 
-from .fitters import fit_log_domain, fit_lin0_domain, fit_linc_domain, FitResult
+from ...fitters import fit_log_domain, fit_lin0_domain, fit_linc_domain, FitResult
 
 
 @dataclass

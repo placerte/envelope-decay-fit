@@ -30,8 +30,8 @@ A functional Python package for piecewise exponential decay fitting with damping
 - Parameter traces (ζ, α) vs window duration
 
 ### ✅ CLI and API
-- Simple command-line tool: `env-decay-fit`
-- Programmatic API: `fit_envelope_decay()`
+- Command-line tool: `env-decay-fit` (segment + fit subcommands)
+- Programmatic API: `fit_piecewise_manual()` (primary) and `fit_piecewise_auto()` (experimental)
 - CSV input support (t_s, env columns)
 
 ## Package Structure
@@ -40,10 +40,11 @@ A functional Python package for piecewise exponential decay fitting with damping
 envelope-decay-fit/
 ├── src/envelope_decay_fit/
 │   ├── __init__.py          # Public API exports
-│   ├── api.py               # Main fit_envelope_decay() function
-│   ├── fitters.py           # LOG, LIN0, LINC fitting functions
-│   ├── windows.py           # Expanding window generation
-│   ├── breakpoint.py        # Two-regime change-point detection
+│   ├── api.py               # Public API functions
+│   ├── models.py            # FitResult / PieceFit models
+│   ├── fitters/             # LOG, LIN0, LINC fitting functions
+│   ├── segmentation/        # manual + experimental auto pipelines
+│   ├── plotting/            # storyboard plotting helpers
 │   ├── flags.py             # Flag system
 │   ├── result.py            # Result dataclasses
 │   ├── plots.py             # Diagnostic plotting
@@ -71,16 +72,18 @@ uv pip install -e .
 
 ### CLI
 ```bash
-env-decay-fit data.csv --fn-hz 775.0 --n-pieces 2 --out-dir ./output
+env-decay-fit segment data.csv --fn-hz 775.0 --breakpoints-out ./output/breakpoints.json
+env-decay-fit fit data.csv --fn-hz 775.0 --breakpoints-file ./output/breakpoints.json
 ```
 
 ### Python API
 ```python
-from envelope_decay_fit import fit_envelope_decay
+from envelope_decay_fit import fit_piecewise_manual
 import numpy as np
 
-result = fit_envelope_decay(t, env, fn_hz=150.0, n_pieces=2)
-print(result.summary())
+breakpoints_t = [t[0], t[-1]]
+fit = fit_piecewise_manual(t, env, breakpoints_t, fn_hz=150.0)
+print(len(fit.pieces))
 ```
 
 ## Testing
@@ -92,7 +95,7 @@ Tested on real datasets:
 
 Test suite:
 ```bash
-python tests/test_basic.py  # All tests pass
+pytest -q
 ```
 
 ## Performance

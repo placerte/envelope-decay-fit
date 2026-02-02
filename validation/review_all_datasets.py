@@ -24,7 +24,11 @@ import pandas as pd
 # Development import (matches your existing scripts style)
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from envelope_decay_fit import fit_envelope_decay  # noqa: E402
+from envelope_decay_fit.plotting import create_diagnostic_plots  # noqa: E402
+from envelope_decay_fit.segmentation.auto.pipeline import (  # noqa: E402
+    AutoSegmentationConfig,
+    fit_piecewise_auto_result,
+)
 
 
 def _timestamp() -> str:
@@ -271,14 +275,13 @@ def main() -> int:
                 t, env = load_envelope_csv(csv_path)
 
                 # Run fit AND write artifacts to hit_out_dir
-                _ = fit_envelope_decay(
-                    t,
-                    env,
-                    fn_hz=fn_hz,
+                config = AutoSegmentationConfig(
                     n_pieces=args.n_pieces,
                     max_windows=args.max_windows,
-                    out_dir=str(hit_out_dir),
                 )
+                result = fit_piecewise_auto_result(t, env, fn_hz, config)
+                plot_paths = create_diagnostic_plots(result, hit_out_dir)
+                result.artifact_paths.update(plot_paths)
 
             except Exception as e:
                 msg = f"{dataset_name}/{csv_path.name}: {e}"

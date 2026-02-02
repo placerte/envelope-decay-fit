@@ -97,7 +97,7 @@ import matplotlib.pyplot as plt
 
 **Package imports:**
 ```python
-from envelope_decay_fit.api import fit_envelope_decay
+from envelope_decay_fit.api import fit_piecewise_manual
 from envelope_decay_fit.config import Config
 from envelope_decay_fit.flags import FlagRecord
 ```
@@ -232,10 +232,10 @@ window_fit = {"i_start": 10, "i_end": 100, ...}  # Avoid
 **Core engine never writes to disk unless explicitly requested:**
 ```python
 # Core API (no I/O by default)
-result = fit_envelope_decay(t, env, fn_hz=150.0, n_pieces=2)
+result = fit_piecewise_manual(t, env, [t[0], t[-1]], fn_hz=150.0)
 
 # Explicit artifact writing
-result = fit_envelope_decay(t, env, fn_hz=150.0, out_dir="./out/run_001")
+result = fit_piecewise_manual(t, env, [t[0], t[-1]], fn_hz=150.0)
 ```
 
 **CLI always writes artifacts by default** (for debugging).

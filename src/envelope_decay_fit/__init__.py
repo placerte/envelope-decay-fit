@@ -1,22 +1,22 @@
-"""Piecewise exponential decay fitting for time-domain response envelopes.
+"""Piecewise exponential decay fitting for time-domain response envelopes."""
 
-This package provides tools to fit exponential decay models to envelope data
-and extract damping ratios with comprehensive diagnostics.
-"""
+from .api import (
+    fit_piecewise_auto,
+    fit_piecewise_manual,
+    launch_manual_segmentation_ui,
+    plot_segmentation_storyboard,
+)
+from .models import FitDiagnostics, FitResult, GlobalFitMetrics, PieceFit
 
 __version__ = "0.1.0"
 
-# Public API
-from .api import fit_envelope_decay, fit_envelope_decay_manual
-from .result import Result, PieceRecord
-from .flags import FlagRecord
-from .manual_segmentation import run_manual_segmentation
-
 __all__ = [
-    "fit_envelope_decay",
-    "fit_envelope_decay_manual",
-    "run_manual_segmentation",
-    "Result",
-    "PieceRecord",
-    "FlagRecord",
+    "FitDiagnostics",
+    "FitResult",
+    "GlobalFitMetrics",
+    "PieceFit",
+    "fit_piecewise_auto",
+    "fit_piecewise_manual",
+    "launch_manual_segmentation_ui",
+    "plot_segmentation_storyboard",
 ]

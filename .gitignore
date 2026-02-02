@@ -25,6 +25,7 @@ htmlcov/
 *~
 
 # Output directories
+.out/
 out/
 *.log
 *-dump-*

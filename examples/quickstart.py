@@ -2,9 +2,10 @@
 """Quickstart example for envelope-decay-fit."""
 
 import numpy as np
+import matplotlib.pyplot as plt
 from pathlib import Path
 
-from envelope_decay_fit import fit_envelope_decay
+from envelope_decay_fit import fit_piecewise_manual, plot_segmentation_storyboard
 
 
 def example_synthetic():
@@ -25,21 +26,19 @@ def example_synthetic():
     env = np.abs(env)
 
     # Fit
-    result = fit_envelope_decay(
-        t,
-        env,
-        fn_hz=fn_hz,
-        n_pieces=1,
-        max_windows=200,
-    )
+    breakpoints_t = [float(t[0]), float(t[-1])]
+    fit = fit_piecewise_manual(t, env, breakpoints_t, fn_hz=fn_hz)
 
-    # Print results
-    print(result.summary())
+    print(f"Pieces: {len(fit.pieces)}")
+    print(
+        f"alpha={fit.pieces[0].params['alpha']:.4f}, "
+        f"zeta={fit.pieces[0].params['zeta']:.5f}"
+    )
 
     print("\nExpected: α ≈ 3.0, ζ ≈ 0.00318")
     print(
-        f"Got:      α = {result.pieces[0].log_fit.alpha:.4f}, "
-        f"ζ = {result.pieces[0].log_fit.zeta:.5f}"
+        f"Got:      α = {fit.pieces[0].params['alpha']:.4f}, "
+        f"ζ = {fit.pieces[0].params['zeta']:.5f}"
     )
 
 
@@ -64,20 +63,17 @@ def example_real_data():
     print(f"Loaded {len(t)} samples from {csv_path.name}")
 
     # Fit with 2 pieces
-    result = fit_envelope_decay(
-        t,
-        env,
-        fn_hz=775.2,  # Known frequency for this dataset
-        n_pieces=2,
-        out_dir="out/quickstart",
-        max_windows=300,
-    )
+    fn_hz = 775.2
+    mid_time = float(t[len(t) // 2])
+    breakpoints_t = [float(t[0]), mid_time, float(t[-1])]
+    fit = fit_piecewise_manual(t, env, breakpoints_t, fn_hz=fn_hz)
 
-    # Print results
-    print(result.summary())
-
-    if result.artifact_paths:
-        print(f"\nPlots saved to: out/quickstart/")
+    out_dir = Path("out/quickstart")
+    out_dir.mkdir(parents=True, exist_ok=True)
+    fig = plot_segmentation_storyboard(t, env, fit, yscale="log")
+    fig.savefig(out_dir / "segmentation_storyboard.png", dpi=150)
+    plt.close(fig)
+    print("\nPlot saved to: out/quickstart/segmentation_storyboard.png")
 
 
 def main():

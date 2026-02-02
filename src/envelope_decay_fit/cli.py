@@ -1,43 +1,36 @@
 #!/usr/bin/env python3
 """Command-line interface for envelope decay fitting."""
 
-import argparse
-import sys
-from pathlib import Path
-import numpy as np
-from datetime import datetime
+from __future__ import annotations
 
-from .api import fit_envelope_decay
-from .manual_segmentation import run_manual_segmentation
-from .plots import create_piecewise_fit_plot
+import argparse
+import json
+from datetime import datetime
+from pathlib import Path
+import sys
+
+import numpy as np
+
+from .api import fit_piecewise_manual, launch_manual_segmentation_ui
+from .models import FitResult
 
 
 def load_envelope_csv(csv_path: Path) -> tuple[np.ndarray, np.ndarray]:
     """Load envelope data from CSV file.
 
-    Expects columns in order: t_s, (other columns...), env
-    Or: t_s, raw, filtered, env
-
-    Args:
-        csv_path: path to CSV file
-
-    Returns:
-        (t, env): time and envelope arrays
+    Expects columns: t_s and env (case-insensitive).
     """
-    # Try to detect column structure
     with open(csv_path) as f:
         header = f.readline().strip()
 
-    cols = header.split(",")
-
-    # Find t_s and env columns
+    cols = [c.strip().lower() for c in header.split(",")]
     t_idx = None
     env_idx = None
 
     for i, col in enumerate(cols):
-        if col.strip().lower() in ["t_s", "t", "time"]:
+        if col in ["t_s", "t", "time"]:
             t_idx = i
-        if col.strip().lower() == "env":
+        if col == "env":
             env_idx = i
 
     if t_idx is None or env_idx is None:
@@ -45,165 +38,221 @@ def load_envelope_csv(csv_path: Path) -> tuple[np.ndarray, np.ndarray]:
             f"Could not find t_s and env columns in {csv_path}. Header: {header}"
         )
 
-    # Load data
     data = np.loadtxt(csv_path, delimiter=",", skiprows=1)
-
     if data.ndim == 1:
         raise ValueError(f"CSV file has only one column: {csv_path}")
 
     t = data[:, t_idx]
     env = data[:, env_idx]
-
     return t, env
 
 
-def main():
-    """CLI entry point."""
-    parser = argparse.ArgumentParser(
-        description="Fit piecewise exponential decay to envelope data",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  # Basic usage
-  env-decay-fit data.csv --fn-hz 775.0
-  
-  # Specify output directory and piece count
-  env-decay-fit data.csv --fn-hz 775.0 --n-pieces 2 --out-dir ./output
-  
-  # Use specific max windows for performance
-  env-decay-fit data.csv --fn-hz 775.0 --max-windows 300
-        """,
+def _parse_breakpoints(value: str) -> list[float]:
+    items = [v.strip() for v in value.split(",") if v.strip()]
+    return [float(v) for v in items]
+
+
+def _default_out_dir(prefix: str) -> Path:
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    return Path("out") / prefix / timestamp
+
+
+def _write_breakpoints_json(path: Path, breakpoints_t: list[float]) -> None:
+    payload = {"breakpoints_t": list(breakpoints_t)}
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w") as handle:
+        json.dump(payload, handle, indent=2)
+
+
+def _write_fit_result_json(path: Path, fit: FitResult) -> None:
+    pieces_payload: list[dict[str, object]] = []
+    for piece in fit.pieces:
+        pieces_payload.append(
+            {
+                "piece_id": int(piece.piece_id),
+                "t_start_s": float(piece.t_start_s),
+                "t_end_s": float(piece.t_end_s),
+                "n_points": int(piece.n_points),
+                "params": {k: float(v) for k, v in piece.params.items()},
+                "r2": float(piece.r2),
+                "flags": list(piece.flags),
+            }
+        )
+
+    payload = {
+        "breakpoints_t": list(fit.breakpoints_t),
+        "pieces": pieces_payload,
+        "global_metrics": None,
+    }
+    if fit.global_metrics is not None:
+        payload["global_metrics"] = {
+            "fn_hz": float(fit.global_metrics.fn_hz),
+            "omega_n": float(fit.global_metrics.omega_n),
+            "n_pieces": int(fit.global_metrics.n_pieces),
+            "n_samples": int(fit.global_metrics.n_samples),
+            "duration_s": float(fit.global_metrics.duration_s),
+        }
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w") as handle:
+        json.dump(payload, handle, indent=2)
+
+
+def _run_segment(args: argparse.Namespace) -> int:
+    t, env = load_envelope_csv(args.input_csv)
+
+    breakpoints = launch_manual_segmentation_ui(
+        t,
+        env,
+        fn_hz=args.fn_hz,
     )
 
-    parser.add_argument(
-        "input_csv",
-        type=Path,
-        help="Input CSV file with columns: t_s, env (and optionally others)",
+    if not breakpoints:
+        print("No breakpoints returned.")
+        return 1
+
+    out_dir = args.out_dir or _default_out_dir("segment")
+    if args.breakpoints_out is None:
+        breakpoints_path = out_dir / "breakpoints.json"
+    else:
+        breakpoints_path = Path(args.breakpoints_out)
+
+    _write_breakpoints_json(breakpoints_path, breakpoints)
+    print(f"Breakpoints saved: {breakpoints_path}")
+    return 0
+
+
+def _run_fit(args: argparse.Namespace) -> int:
+    t, env = load_envelope_csv(args.input_csv)
+
+    if args.breakpoints is None and args.breakpoints_file is None:
+        raise ValueError("Provide --breakpoints or --breakpoints-file")
+
+    breakpoints_t: list[float]
+    if args.breakpoints is not None:
+        breakpoints_t = _parse_breakpoints(args.breakpoints)
+    else:
+        with open(args.breakpoints_file) as handle:
+            payload = json.load(handle)
+        breakpoints_t = [float(v) for v in payload.get("breakpoints_t", [])]
+
+    fit = fit_piecewise_manual(
+        t,
+        env,
+        breakpoints_t,
+        fn_hz=args.fn_hz,
     )
 
-    parser.add_argument(
-        "--fn-hz", type=float, required=True, help="Natural frequency in Hz (required)"
+    out_dir = args.out_dir or _default_out_dir("fit")
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    result_path = out_dir / "fit_result.json"
+    _write_fit_result_json(result_path, fit)
+
+    from .plotting import plot_segmentation_storyboard
+
+    fig = plot_segmentation_storyboard(t, env, fit, yscale=args.yscale)
+    plot_path = out_dir / "segmentation_storyboard.png"
+    fig.savefig(plot_path, dpi=150)
+    fig.clf()
+
+    print(f"Fit results saved: {result_path}")
+    print(f"Storyboard plot: {plot_path}")
+    return 0
+
+
+def _run_segment_fit(args: argparse.Namespace) -> int:
+    t, env = load_envelope_csv(args.input_csv)
+
+    breakpoints = launch_manual_segmentation_ui(
+        t,
+        env,
+        fn_hz=args.fn_hz,
     )
 
-    parser.add_argument(
-        "--n-pieces",
-        type=int,
-        default=2,
-        help="Number of decay pieces to extract (default: 2)",
+    if not breakpoints:
+        print("No breakpoints returned.")
+        return 1
+
+    out_dir = args.out_dir or _default_out_dir("segment_fit")
+    breakpoints_path = out_dir / "breakpoints.json"
+    _write_breakpoints_json(breakpoints_path, breakpoints)
+
+    fit = fit_piecewise_manual(
+        t,
+        env,
+        breakpoints,
+        fn_hz=args.fn_hz,
     )
 
-    parser.add_argument(
-        "--out-dir",
-        type=Path,
-        default=None,
-        help="Output directory for plots and results (default: ./out/<timestamp>)",
-    )
+    out_dir.mkdir(parents=True, exist_ok=True)
+    result_path = out_dir / "fit_result.json"
+    _write_fit_result_json(result_path, fit)
 
-    parser.add_argument(
-        "--max-windows",
-        type=int,
-        default=500,
-        help="Maximum windows per piece for performance (default: 500)",
-    )
+    from .plotting import plot_segmentation_storyboard
 
-    parser.add_argument(
-        "--manual-segmentation",
-        action="store_true",
-        help="Enable manual segmentation with interactive Matplotlib",
-    )
+    fig = plot_segmentation_storyboard(t, env, fit, yscale=args.yscale)
+    plot_path = out_dir / "segmentation_storyboard.png"
+    fig.savefig(plot_path, dpi=150)
+    fig.clf()
 
-    parser.add_argument(
-        "--manual-min-points",
-        type=int,
-        default=10,
-        help="Minimum samples per manual segment (default: 10)",
-    )
+    print(f"Breakpoints saved: {breakpoints_path}")
+    print(f"Fit results saved: {result_path}")
+    print(f"Storyboard plot: {plot_path}")
+    return 0
 
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Envelope decay fitting CLI")
     parser.add_argument("--version", action="version", version="%(prog)s 0.1.0")
+    subparsers = parser.add_subparsers(dest="command")
 
-    args = parser.parse_args()
+    segment = subparsers.add_parser(
+        "segment", help="Launch manual segmentation UI and save breakpoints"
+    )
+    segment.add_argument("input_csv", type=Path)
+    segment.add_argument("--fn-hz", type=float, required=True)
+    segment.add_argument("--out-dir", type=Path, default=None)
+    segment.add_argument("--breakpoints-out", type=Path, default=None)
+    segment.set_defaults(func=_run_segment)
 
-    # Validate input file
+    fit = subparsers.add_parser("fit", help="Fit using provided breakpoints")
+    fit.add_argument("input_csv", type=Path)
+    fit.add_argument("--fn-hz", type=float, required=True)
+    fit.add_argument("--breakpoints", type=str, default=None)
+    fit.add_argument("--breakpoints-file", type=Path, default=None)
+    fit.add_argument("--yscale", type=str, default="linear")
+    fit.add_argument("--out-dir", type=Path, default=None)
+    fit.set_defaults(func=_run_fit)
+
+    segment_fit = subparsers.add_parser(
+        "segment-fit",
+        help="Launch manual UI, then fit and save outputs",
+    )
+    segment_fit.add_argument("input_csv", type=Path)
+    segment_fit.add_argument("--fn-hz", type=float, required=True)
+    segment_fit.add_argument("--yscale", type=str, default="linear")
+    segment_fit.add_argument("--out-dir", type=Path, default=None)
+    segment_fit.set_defaults(func=_run_segment_fit)
+
+    argv = sys.argv[1:]
+    known_commands = {"segment", "fit", "segment-fit"}
+    passthrough_flags = {"-h", "--help", "--version"}
+    if argv and argv[0] not in known_commands and argv[0] not in passthrough_flags:
+        argv = ["segment-fit", *argv]
+
+    args = parser.parse_args(argv)
+
     if not args.input_csv.exists():
         print(f"Error: Input file not found: {args.input_csv}", file=sys.stderr)
         return 1
 
-    # Set default output directory
-    if args.out_dir is None:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        args.out_dir = Path("out") / timestamp
-
-    # Load data
-    print(f"Loading envelope data from {args.input_csv}...")
     try:
-        t, env = load_envelope_csv(args.input_csv)
-    except Exception as e:
-        print(f"Error loading CSV: {e}", file=sys.stderr)
+        return args.func(args)
+    except Exception as exc:
+        print(f"Error: {exc}", file=sys.stderr)
         return 1
-
-    print(f"Loaded {len(t)} samples, duration: {t[-1] - t[0]:.4f} s")
-    print(f"Envelope range: [{env.min():.3e}, {env.max():.3e}]")
-
-    # Run fitting
-    if args.manual_segmentation:
-        print(
-            f"\nManual segmentation mode (fn={args.fn_hz:.2f} Hz, min_points={args.manual_min_points})..."
-        )
-        try:
-            manual_result = run_manual_segmentation(
-                t,
-                env,
-                fn_hz=args.fn_hz,
-                min_points=args.manual_min_points,
-                out_dir=args.out_dir,
-            )
-        except Exception as e:
-            print(f"Error during manual segmentation: {e}", file=sys.stderr)
-            import traceback
-
-            traceback.print_exc()
-            return 1
-
-        if manual_result is None:
-            print("Manual segmentation canceled. No results saved.")
-            return 0
-
-        result = manual_result
-
-        if args.out_dir is not None:
-            plot_path = create_piecewise_fit_plot(
-                result, args.out_dir / "piecewise_fit.png"
-            )
-            result.artifact_paths["piecewise_fit"] = plot_path
-    else:
-        print(f"\nFitting with fn={args.fn_hz:.2f} Hz, n_pieces={args.n_pieces}...")
-        try:
-            result = fit_envelope_decay(
-                t,
-                env,
-                fn_hz=args.fn_hz,
-                n_pieces=args.n_pieces,
-                out_dir=args.out_dir,
-                max_windows=args.max_windows,
-            )
-        except Exception as e:
-            print(f"Error during fitting: {e}", file=sys.stderr)
-            import traceback
-
-            traceback.print_exc()
-            return 1
-
-    # Print summary
-    print("\n" + result.summary())
-
-    # Report artifacts
-    if result.artifact_paths:
-        print(f"\nArtifacts written to: {args.out_dir}")
-        for name, path in result.artifact_paths.items():
-            print(f"  {name}: {path.name}")
-
-    return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())
