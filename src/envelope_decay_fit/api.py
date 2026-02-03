@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 import numpy as np
 
@@ -130,12 +130,22 @@ def plot_segmentation_storyboard(
     fit: FitResult,
     *,
     ax: "Axes | None" = None,
-    yscale: str = "linear",
+    yscale: str = "log",
+    title: str | None = None,
+    title_mode: Literal["append", "replace"] = "append",
 ) -> "Figure":
     """Plot envelope data with piecewise exponential fits."""
     from .plotting.storyboard import plot_segmentation_storyboard as _plot
 
-    return _plot(t, env, fit, ax=ax, yscale=yscale)
+    return _plot(
+        t,
+        env,
+        fit,
+        ax=ax,
+        yscale=yscale,
+        title=title,
+        title_mode=title_mode,
+    )
 
 
 def _validate_inputs(t: np.ndarray, env: np.ndarray, fn_hz: float) -> None:

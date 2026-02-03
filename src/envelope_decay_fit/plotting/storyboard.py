@@ -6,9 +6,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
-from typing import cast
+from typing import Literal, cast
 
-from .plot_export import export_plot
 from ..models import FitResult
 from ..result import Result
 
@@ -55,7 +54,9 @@ def plot_segmentation_storyboard(
     fit: FitResult,
     *,
     ax: Axes | None = None,
-    yscale: str = "linear",
+    yscale: str = "log",
+    title: str | None = None,
+    title_mode: Literal["append", "replace"] = "append",
 ) -> Figure:
     """Plot envelope data with piecewise exponential fits.
 
@@ -65,6 +66,8 @@ def plot_segmentation_storyboard(
         fit: FitResult from the public API
         ax: optional matplotlib Axes to draw on
         yscale: "linear" or "log"
+        title: optional title text to append or replace
+        title_mode: "append" or "replace" when title is provided
 
     Returns:
         Matplotlib Figure containing the plot
@@ -102,7 +105,19 @@ def plot_segmentation_storyboard(
 
     ax.set_xlabel("Time (s)")
     ax.set_ylabel("Envelope amplitude")
-    ax.set_title("Segmentation Storyboard")
+    base_title = "Segmentation Storyboard"
+    if fit.global_metrics is not None:
+        base_title = f"Segmentation Storyboard (fn={fit.global_metrics.fn_hz:.1f} Hz)"
+
+    if title:
+        if title_mode == "replace":
+            full_title = title
+        else:
+            full_title = f"{base_title} - {title}"
+    else:
+        full_title = base_title
+
+    ax.set_title(full_title)
     ax.grid(True, alpha=0.3)
     if yscale == "log":
         ax.set_yscale("log", nonpositive="clip")
@@ -115,6 +130,8 @@ def plot_segmentation_storyboard(
 
 def create_piecewise_fit_plot(result: Result, out_path: Path) -> Path:
     """Create piecewise fit visualization."""
+    from .plot_export import export_plot
+
     fig, axes = plt.subplots(2, 1, figsize=(12, 8))
 
     t = result.t
@@ -211,6 +228,7 @@ def create_piecewise_fit_plot(result: Result, out_path: Path) -> Path:
 
 def create_score_traces_plot(result: Result, out_path: Path) -> Path:
     """Create R² score traces plot."""
+    from .plot_export import export_plot
     from ..segmentation.auto.window_scan import WindowFitRecord, extract_score_trace
 
     fig, ax = plt.subplots(figsize=(12, 6))
@@ -312,6 +330,7 @@ def create_score_traces_plot(result: Result, out_path: Path) -> Path:
 
 def create_param_traces_plot(result: Result, out_path: Path) -> Path:
     """Create parameter traces plot (ζ vs Δt)."""
+    from .plot_export import export_plot
     from ..segmentation.auto.window_scan import extract_param_trace
 
     fig, axes = plt.subplots(2, 1, figsize=(12, 8))
@@ -391,6 +410,7 @@ def create_param_traces_plot(result: Result, out_path: Path) -> Path:
 
 def create_segmentation_storyboard_plot(result: Result, out_path: Path) -> Path:
     """Create segmentation storyboard plot (R² in global time)."""
+    from .plot_export import export_plot
     from ..segmentation.auto.window_scan import WindowFitRecord
 
     fig, ax = plt.subplots(figsize=(12, 6))

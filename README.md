@@ -207,7 +207,7 @@ You are free to use, modify, and embed this code in other projects.
 
 ## Status
 
-**Version 0.1.0** - Working prototype
+**Version 0.1.1** - Working prototype
 
 The package is functional and has been tested on real datasets. Key features:
 - ✅ Three fitting methods (LOG, LIN0, LINC)
@@ -215,7 +215,7 @@ The package is functional and has been tested on real datasets. Key features:
 - ✅ Diagnostic plots and flag system
 - ✅ CLI and programmatic API
 
-### Known Limitations (v0.1.0)
+### Known Limitations (v0.1.1)
 
 1. **Window Sampling**: For performance, expanding windows are sampled (max 500 by default) rather than generating all possible windows. This is a pragmatic optimization that provides good results while keeping computation tractable for large datasets.
 

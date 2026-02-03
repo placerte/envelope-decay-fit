@@ -250,12 +250,22 @@ class ManualSegmentationUI:
             self._rebuild_boundaries()
             self.last_action = "Loaded initial boundaries"
 
+        title_size = 18
+        label_size = 16
+        tick_size = 14
+        overlay_size = 16
+
         self.fig, self.ax = plt.subplots(figsize=(12, 6))
         self.ax.plot(self.t, self.env, "k-", alpha=0.6, linewidth=1)
-        self.ax.set_xlabel("Time (s)")
-        self.ax.set_ylabel("Envelope amplitude")
-        self.ax.set_title("Manual Segmentation (keyboard-driven boundaries)")
+        self.ax.set_xlabel("Time (s)", fontsize=label_size)
+        self.ax.set_ylabel("Envelope amplitude", fontsize=label_size)
+        self.ax.set_title(
+            f"Manual Segmentation (keyboard-driven boundaries) - fn={self.fn_hz:.1f} Hz",
+            fontsize=title_size,
+        )
         self.ax.grid(True, alpha=0.3)
+        self.ax.set_yscale("log", nonpositive="clip")
+        self.ax.tick_params(axis="both", labelsize=tick_size)
 
         self.boundary_lines: list[Line2D] = []
         self.fit_lines: list[Line2D] = []
@@ -266,7 +276,7 @@ class ManualSegmentationUI:
             transform=self.ax.transAxes,
             va="top",
             ha="right",
-            fontsize=9,
+            fontsize=overlay_size,
             bbox={"boxstyle": "round", "facecolor": "white", "alpha": 0.8},
         )
         self.help_text = self.ax.text(
@@ -276,7 +286,7 @@ class ManualSegmentationUI:
             transform=self.ax.transAxes,
             va="bottom",
             ha="left",
-            fontsize=9,
+            fontsize=overlay_size,
             bbox={"boxstyle": "round", "facecolor": "white", "alpha": 0.7},
         )
 
@@ -371,13 +381,6 @@ class ManualSegmentationUI:
             return
 
     def _delete_nearest_boundary(self) -> None:
-        if self._toolbar_active():
-            mode = self._get_toolbar_mode()
-            self.last_action = f"Ignored delete while MODE = {mode}"
-            self._update_info_text([float(self.t[i]) for i in self.boundary_indices])
-            self.fig.canvas.draw_idle()
-            return
-
         if not self.boundary_indices:
             self.last_action = "No boundaries to delete"
             self._update_info_text([float(self.t[i]) for i in self.boundary_indices])
@@ -422,13 +425,6 @@ class ManualSegmentationUI:
         self.boundary_indices = sorted(set(self.boundary_order))
 
     def _add_boundary_at_cursor(self) -> None:
-        if self._toolbar_active():
-            mode = self._get_toolbar_mode()
-            self.last_action = f"Ignored add while MODE = {mode}"
-            self._update_info_text([float(self.t[i]) for i in self.boundary_indices])
-            self.fig.canvas.draw_idle()
-            return
-
         if self.last_mouse_x is None:
             self.last_action = "Move cursor over plot to add"
             self._update_info_text([float(self.t[i]) for i in self.boundary_indices])
@@ -457,9 +453,6 @@ class ManualSegmentationUI:
         if "zoom" in mode_text:
             return "ZOOM"
         return "NONE"
-
-    def _toolbar_active(self) -> bool:
-        return self._get_toolbar_mode() != "NONE"
 
     def _refresh_plot(self, recompute: bool = True) -> None:
         for line in self.boundary_lines:
@@ -513,8 +506,10 @@ class ManualSegmentationUI:
         k = len(boundary_times)
         n_pieces = max(k - 1, 0)
         time_text = ", ".join(f"{t_val:.6f}" for t_val in boundary_times)
+        scale = self.ax.get_yscale()
 
         lines = [
+            f"fn_hz={self.fn_hz:.1f} | scale={scale}",
             f"boundaries k={k} | pieces={n_pieces}",
             f"t_s=[{time_text}]" if time_text else "t_s=[]",
             f"last: {self.last_action}",

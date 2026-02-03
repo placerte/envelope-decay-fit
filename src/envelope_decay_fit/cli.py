@@ -204,7 +204,7 @@ def _run_segment_fit(args: argparse.Namespace) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Envelope decay fitting CLI")
-    parser.add_argument("--version", action="version", version="%(prog)s 0.1.0")
+    parser.add_argument("--version", action="version", version="%(prog)s 0.1.1")
     subparsers = parser.add_subparsers(dest="command")
 
     segment = subparsers.add_parser(
