@@ -1,4 +1,4 @@
-# envelope-decay-fit v0.1.1 - Package Summary
+# envelope-decay-fit v0.1.2 - Package Summary
 
 **Status:** ✅ Working prototype, PyPI-ready (not published)
 
@@ -104,7 +104,7 @@ pytest -q
 - **Scaling:** Linear with `max_windows` parameter
 - **Default:** max_windows=500 provides good balance
 
-## Known Limitations (v0.1.1)
+## Known Limitations (v0.1.2)
 
 ### 1. Window Sampling (Pragmatic Optimization)
 **Issue:** Full expanding window algorithm generates O(n²) windows, impractical for large datasets.
@@ -121,7 +121,7 @@ pytest -q
 ### 2. No Tail Trimming
 **Spec requirement:** Automatic tail trimming using median + MAD floor estimation.
 
-**Status:** Not implemented in v0.1.1.
+**Status:** Not implemented in v0.1.2.
 
 **Workaround:** Pre-process data to remove noise-dominated tails if needed.
 

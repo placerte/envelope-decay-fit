@@ -7,7 +7,7 @@ Agent guidelines for working in the `envelope-decay-fit` repository.
 ## Project Overview
 
 **Type:** Python 3.13+ scientific utility for piecewise exponential decay fitting  
-**Status:** Early development (v0.1.1) — core implementation not yet built  
+**Status:** Early development (v0.1.2) — core implementation not yet built  
 **Purpose:** Fit time-domain response envelopes to extract damping ratio (ζ) with rich diagnostics  
 **Package Manager:** `uv` (required)
 

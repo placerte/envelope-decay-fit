@@ -5,9 +5,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 import json
+from typing import Any, cast
 
 import numpy as np
 from matplotlib.backend_bases import Event
+from matplotlib.legend import Legend
+from matplotlib.lines import Line2D
 
 from ..fitters import fit_log_domain, fit_lin0_domain, fit_linc_domain, FitResult
 from ..flags import FlagRecord
@@ -234,8 +237,10 @@ class ManualSegmentationUI:
     skip_save: bool = False
     last_mouse_x: float | None = None
     last_action: str = "Ready"
-    help_visible: bool = True
+    help_visible: bool = False
     last_toolbar_mode: str = "NONE"
+    env_line: Line2D | None = None
+    legend: Legend | None = None
 
     def run(self) -> Result | None:
         """Launch the interactive session and return a Result if committed."""
@@ -256,7 +261,9 @@ class ManualSegmentationUI:
         overlay_size = 16
 
         self.fig, self.ax = plt.subplots(figsize=(12, 6))
-        self.ax.plot(self.t, self.env, "k-", alpha=0.6, linewidth=1)
+        self.env_line = self.ax.plot(
+            self.t, self.env, "k-", alpha=0.6, linewidth=1, label="Envelope"
+        )[0]
         self.ax.set_xlabel("Time (s)", fontsize=label_size)
         self.ax.set_ylabel("Envelope amplitude", fontsize=label_size)
         self.ax.set_title(
@@ -284,7 +291,7 @@ class ManualSegmentationUI:
             0.02,
             "",
             transform=self.ax.transAxes,
-            va="bottom",
+            va="top",
             ha="left",
             fontsize=overlay_size,
             bbox={"boxstyle": "round", "facecolor": "white", "alpha": 0.7},
@@ -377,8 +384,7 @@ class ManualSegmentationUI:
     def _on_close(self, event: Event) -> None:
         if self.skip_save:
             return
-        if self.committed:
-            return
+        self.committed = True
 
     def _delete_nearest_boundary(self) -> None:
         if not self.boundary_indices:
@@ -474,7 +480,9 @@ class ManualSegmentationUI:
             )
 
         for time_s in boundary_times:
-            line = self.ax.axvline(time_s, color="red", linestyle="--", alpha=0.7)
+            line = self.ax.axvline(
+                time_s, color="red", linestyle="--", alpha=0.7, label="Boundary"
+            )
             self.boundary_lines.append(line)
 
         colors = ["blue", "green", "orange", "purple", "brown"]
@@ -495,11 +503,13 @@ class ManualSegmentationUI:
                 color=color,
                 linewidth=2,
                 alpha=0.8,
+                label=f"Log fit {piece.piece_id}",
             )[0]
             self.fit_lines.append(line)
 
-        self._update_info_text(boundary_times)
+        self._update_legend()
         self._update_help_text()
+        self._update_info_text(boundary_times)
         self.fig.canvas.draw_idle()
 
     def _update_info_text(self, boundary_times: list[float]) -> None:
@@ -535,29 +545,114 @@ class ManualSegmentationUI:
                 lines.append(f"warning: {flag.details}")
 
         self.info_text.set_text("\n".join(lines))
+        self._place_info_overlay()
 
     def _update_help_text(self) -> None:
         mode = self._get_toolbar_mode()
         if mode != self.last_toolbar_mode:
             self.last_toolbar_mode = mode
 
+        self.help_text.set_visible(True)
         if not self.help_visible:
-            self.help_text.set_visible(False)
+            self.help_text.set_text("h: help")
+            self._place_help_overlay()
             return
 
-        self.help_text.set_visible(True)
         lines = [
-            f"MODE: {mode if mode != 'NONE' else 'ADD'}",
-            "",
-            "Keys:",
-            "  a  add boundary at cursor",
-            "  x  delete nearest boundary",
-            "  c  clear all boundaries",
-            "  l  toggle lin/log scale",
-            "  h  toggle help",
-            "  q  quit",
+            "a: add boundary",
+            "x: delete nearest boundary",
+            "c: clear boundaries",
+            "l: toggle lin/log",
+            "h: toggle help",
+            "q: save and quit",
         ]
         self.help_text.set_text("\n".join(lines))
+        self._place_help_overlay()
+
+    def _update_legend(self) -> None:
+        handles: list[Line2D] = []
+        labels: list[str] = []
+
+        if self.env_line is not None:
+            handles.append(self.env_line)
+            labels.append("Envelope")
+
+        if self.boundary_lines:
+            handles.append(self.boundary_lines[0])
+            labels.append("Boundary")
+
+        for line in self.fit_lines:
+            handles.append(line)
+            labels.append(str(line.get_label()))
+
+        if not handles:
+            if self.legend is not None:
+                self.legend.remove()
+                self.legend = None
+            return
+
+        if self.legend is not None:
+            self.legend.remove()
+
+        self.legend = self.ax.legend(
+            handles=handles,
+            labels=labels,
+            loc="upper right",
+            framealpha=0.9,
+        )
+
+    def _place_help_overlay(self) -> None:
+        self.help_text.set_position((0.98, 0.02))
+        self.help_text.set_horizontalalignment("right")
+        self.help_text.set_verticalalignment("bottom")
+
+    def _place_info_overlay(self) -> None:
+        if self.fig is None:
+            return
+
+        self.fig.canvas.draw()
+        renderer = cast(Any, self.fig.canvas).get_renderer()
+
+        legend_bbox = None
+        if self.legend is not None:
+            legend_bbox = self.legend.get_window_extent(renderer=renderer)
+
+        help_bbox = None
+        if self.help_text is not None:
+            help_bbox = self.help_text.get_window_extent(renderer=renderer)
+
+        padding_ax = 0.02
+        candidates: list[tuple[float, float]] = [(0.98, 0.98)]
+
+        if legend_bbox is not None:
+            legend_bbox_ax = self.ax.transAxes.inverted().transform_bbox(legend_bbox)
+            candidate_y = legend_bbox_ax.y0 - padding_ax
+            if candidate_y > 0.02:
+                candidates.append((0.98, candidate_y))
+
+        if help_bbox is not None:
+            help_bbox_ax = self.ax.transAxes.inverted().transform_bbox(help_bbox)
+            candidate_y = help_bbox_ax.y0 - padding_ax
+            if candidate_y > 0.02:
+                candidates.append((0.98, candidate_y))
+
+        candidates.append((0.98, 0.02))
+
+        for x_pos, y_pos in candidates:
+            self.info_text.set_position((x_pos, y_pos))
+            self.info_text.set_horizontalalignment("right")
+            self.info_text.set_verticalalignment("top" if y_pos > 0.5 else "bottom")
+            self.fig.canvas.draw()
+            info_bbox = self.info_text.get_window_extent(renderer=renderer)
+
+            overlaps = False
+            if legend_bbox is not None and info_bbox.overlaps(legend_bbox):
+                overlaps = True
+            if help_bbox is not None and info_bbox.overlaps(help_bbox):
+                overlaps = True
+
+            if not overlaps:
+                return
 
 
 def run_manual_segmentation(

@@ -8,7 +8,7 @@ from .api import (
 )
 from .models import FitDiagnostics, FitResult, GlobalFitMetrics, PieceFit
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 
 __all__ = [
     "FitDiagnostics",

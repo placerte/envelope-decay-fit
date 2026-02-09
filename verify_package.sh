@@ -2,7 +2,7 @@
 # Quick verification script for envelope-decay-fit package
 
 echo "=================================================="
-echo "envelope-decay-fit v0.1.1 - Package Verification"
+echo "envelope-decay-fit v0.1.2 - Package Verification"
 echo "=================================================="
 echo ""
 
