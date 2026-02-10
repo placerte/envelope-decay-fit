@@ -8,7 +8,13 @@ from typing import TYPE_CHECKING, Literal
 import numpy as np
 
 from .flags import FlagRecord
-from .models import FitDiagnostics, FitResult, GlobalFitMetrics, PieceFit
+from .models import (
+    FitDiagnostics,
+    FitResult,
+    GlobalFitMetrics,
+    PieceFit,
+    TxSpanMeasurement,
+)
 from .result import Result
 from .segmentation.auto.pipeline import (
     AutoSegmentationConfig,
@@ -21,6 +27,7 @@ from .segmentation.manual import (
     run_manual_segmentation,
     snap_boundary_times_to_indices,
 )
+from .segmentation.tx_span import TxSpanConfig, run_tx_span_measurement_ui
 
 
 LOGGER = logging.getLogger(__name__)
@@ -122,6 +129,24 @@ def launch_manual_segmentation_ui(
         return []
 
     return list(result.manual_boundaries_time_s)
+
+
+def launch_tx_span_ui(
+    t: np.ndarray,
+    env: np.ndarray,
+    *,
+    fn_hz: float | None = None,
+    tx_options_db: list[float] | None = None,
+    ui_config: TxSpanConfig | None = None,
+) -> TxSpanMeasurement | None:
+    """Launch the span-based Tx measurement UI and return the payload."""
+    return run_tx_span_measurement_ui(
+        t,
+        env,
+        fn_hz=fn_hz,
+        tx_options_db=tx_options_db,
+        config=ui_config,
+    )
 
 
 def plot_segmentation_storyboard(

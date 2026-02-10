@@ -4,9 +4,16 @@ from .api import (
     fit_piecewise_auto,
     fit_piecewise_manual,
     launch_manual_segmentation_ui,
+    launch_tx_span_ui,
     plot_segmentation_storyboard,
 )
-from .models import FitDiagnostics, FitResult, GlobalFitMetrics, PieceFit
+from .models import (
+    FitDiagnostics,
+    FitResult,
+    GlobalFitMetrics,
+    PieceFit,
+    TxSpanMeasurement,
+)
 
 __version__ = "0.1.2"
 
@@ -15,8 +22,10 @@ __all__ = [
     "FitResult",
     "GlobalFitMetrics",
     "PieceFit",
+    "TxSpanMeasurement",
     "fit_piecewise_auto",
     "fit_piecewise_manual",
     "launch_manual_segmentation_ui",
+    "launch_tx_span_ui",
     "plot_segmentation_storyboard",
 ]

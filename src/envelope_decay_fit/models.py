@@ -51,3 +51,18 @@ class FitResult:
     breakpoints_t: list[float]
     global_metrics: GlobalFitMetrics | None
     diagnostics: FitDiagnostics | None
+
+
+@dataclass
+class TxSpanMeasurement:
+    """Span-based Tx measurement payload."""
+
+    t0: float
+    t1: float
+    Tx_active: str
+    Tx_value: float
+    slope_db_per_s: float
+    linearity_r2: float
+    linearity_rms_db: float
+    flags: list[FlagRecord]
+    zeta: float | None

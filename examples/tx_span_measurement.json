@@ -1,0 +1,52 @@
+{
+  "t0": 0.0,
+  "t1": 1.4,
+  "Tx_active": "T10",
+  "Tx_value": 10.0,
+  "slope_db_per_s": 7.142857142857143,
+  "linearity_r2": -0.2591877905613582,
+  "linearity_rms_db": 7.547032699023792,
+  "flags": [
+    {
+      "scope": "global",
+      "scope_id": "tx_span",
+      "severity": "warn",
+      "code": "flag_low_linearity",
+      "message": "Linearity is below the threshold",
+      "details": "r2=-0.2592, threshold=0.95"
+    },
+    {
+      "scope": "global",
+      "scope_id": "tx_span",
+      "severity": "warn",
+      "code": "flag_high_rms_db",
+      "message": "RMS deviation is above the threshold",
+      "details": "rms_db=7.547, threshold=1.00"
+    },
+    {
+      "scope": "global",
+      "scope_id": "tx_span",
+      "severity": "warn",
+      "code": "flag_db_drop_mismatch",
+      "message": "Measured dB drop differs from selected Tx",
+      "details": "drop_db=22.205, tx_db=10.0"
+    },
+    {
+      "scope": "global",
+      "scope_id": "tx_span",
+      "severity": "info",
+      "code": "flag_non_monotonic",
+      "message": "Span contains non-monotonic decay",
+      "details": ""
+    },
+    {
+      "scope": "global",
+      "scope_id": "tx_span",
+      "severity": "info",
+      "code": "flag_hits_noise_floor",
+      "message": "Span approaches the noise floor",
+      "details": "floor_db=-23.67"
+    }
+  ],
+  "zeta": 0.0010906779745229582
+}
