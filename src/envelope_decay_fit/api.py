@@ -50,13 +50,23 @@ def fit_piecewise_manual(
     """Fit decay pieces using explicit manual breakpoints.
 
     Args:
-        t: time array (seconds, strictly increasing)
-        env: envelope amplitude
-        breakpoints_t: boundary times in seconds (snapped to samples)
-        fn_hz: natural frequency in Hz
-        fitter: reserved for future expansion (currently only "exp")
-        weights: reserved for future expansion
-        return_diagnostics: include flags and traces in FitDiagnostics
+        t: Time array in seconds (strictly increasing).
+        env: Envelope amplitude (linear scale, same length as t).
+        breakpoints_t: Boundary times in seconds (snapped to samples).
+        fn_hz: Natural frequency in Hz.
+        fitter: Reserved for future expansion (currently only "exp").
+        weights: Reserved for future expansion (unused).
+        return_diagnostics: Include flags and traces in FitDiagnostics.
+
+    Returns:
+        FitResult containing piecewise parameters, breakpoints, and diagnostics.
+
+    Assumptions:
+        - Envelope represents a single-mode exponential decay in each piece.
+        - Damping ratio uses zeta = alpha / (2*pi*fn_hz).
+
+    Raises:
+        ValueError: If inputs are inconsistent or unsupported options are passed.
     """
     _validate_inputs(t, env, fn_hz)
 
@@ -99,7 +109,22 @@ def fit_piecewise_auto(
     config: AutoSegmentationConfig | None = None,
     return_diagnostics: bool = True,
 ) -> FitResult:
-    """Fit decay pieces using the experimental auto segmentation pipeline."""
+    """Fit decay pieces using the experimental auto segmentation pipeline.
+
+    Args:
+        t: Time array in seconds (strictly increasing).
+        env: Envelope amplitude (linear scale, same length as t).
+        fn_hz: Natural frequency in Hz.
+        config: Auto segmentation configuration (optional).
+        return_diagnostics: Include flags and traces in FitDiagnostics.
+
+    Returns:
+        FitResult containing piecewise parameters, breakpoints, and diagnostics.
+
+    Assumptions:
+        - Uses expanding-window R2 traces to detect breakpoints.
+        - Damping ratio uses zeta = alpha / (2*pi*fn_hz).
+    """
     result = fit_piecewise_auto_result(t, env, fn_hz, config)
     return _result_to_fit_result(result, include_diagnostics=return_diagnostics)
 
@@ -112,7 +137,18 @@ def launch_manual_segmentation_ui(
     initial_breakpoints_t: list[float] | None = None,
     ui_config: ManualUIConfig | None = None,
 ) -> list[float]:
-    """Launch the interactive manual segmentation UI and return breakpoints."""
+    """Launch the interactive manual segmentation UI and return breakpoints.
+
+    Args:
+        t: Time array in seconds (strictly increasing).
+        env: Envelope amplitude (linear scale, same length as t).
+        fn_hz: Natural frequency in Hz.
+        initial_breakpoints_t: Optional initial boundaries in seconds.
+        ui_config: Manual UI configuration (optional).
+
+    Returns:
+        List of breakpoint times in seconds (empty if user cancels).
+    """
     if ui_config is None:
         ui_config = ManualUIConfig()
 
@@ -139,7 +175,21 @@ def launch_tx_span_ui(
     tx_options_db: list[float] | None = None,
     ui_config: TxSpanConfig | None = None,
 ) -> TxSpanMeasurement | None:
-    """Launch the span-based Tx measurement UI and return the payload."""
+    """Launch the span-based Tx measurement UI and return the payload.
+
+    Args:
+        t: Time array in seconds (strictly increasing).
+        env: Envelope amplitude (linear scale, same length as t).
+        fn_hz: Natural frequency in Hz (optional for zeta).
+        tx_options_db: Candidate Tx drops in dB (e.g., [10, 20, 30, 60]).
+        ui_config: Tx span configuration (optional).
+
+    Returns:
+        TxSpanMeasurement payload if committed, otherwise None.
+
+    Assumptions:
+        - Measurements are based on log-amplitude in dB re max(env).
+    """
     return run_tx_span_measurement_ui(
         t,
         env,
@@ -159,7 +209,20 @@ def plot_segmentation_storyboard(
     title: str | None = None,
     title_mode: Literal["append", "replace"] = "append",
 ) -> "Figure":
-    """Plot envelope data with piecewise exponential fits."""
+    """Plot envelope data with piecewise exponential fits.
+
+    Args:
+        t: Time array in seconds.
+        env: Envelope amplitude (linear scale).
+        fit: FitResult from the public API.
+        ax: Optional Matplotlib Axes to draw on.
+        yscale: "linear" or "log".
+        title: Optional plot title.
+        title_mode: "append" or "replace" when title is provided.
+
+    Returns:
+        Matplotlib Figure containing the plot.
+    """
     from .plotting.storyboard import plot_segmentation_storyboard as _plot
 
     return _plot(

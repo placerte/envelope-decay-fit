@@ -17,7 +17,17 @@ from ..models import TxSpanMeasurement
 
 @dataclass
 class TxSpanConfig:
-    """Configuration for span-based Tx measurement."""
+    """Configuration for span-based Tx measurement.
+
+    Attributes:
+        min_points: Minimum samples required inside the span.
+        min_span_s: Minimum span duration in seconds.
+        low_linearity_r2: R2 threshold for flagging low linearity.
+        high_rms_db: RMS threshold in dB for flagging high deviation.
+        mismatch_db: Allowed mismatch between actual drop and Tx value (dB).
+        noise_floor_margin_db: Margin to flag proximity to noise floor (dB).
+        non_monotonic_tolerance_db: Positive tolerance for non-monotonic steps (dB).
+    """
 
     min_points: int = 10
     min_span_s: float = 0.01
@@ -29,6 +39,19 @@ class TxSpanConfig:
 
 
 def _compute_log_envelope_db(env: np.ndarray) -> np.ndarray:
+    """Convert envelope to log-amplitude dB re max(env).
+
+    Args:
+        env: Envelope amplitude (linear scale).
+
+    Returns:
+        Log-amplitude in dB, referenced to the maximum envelope value.
+        Non-positive values map to NaN.
+
+    Assumptions:
+        - Reference level is max(|env|) over the provided array.
+        - Uses 20*log10 for amplitude (not energy).
+    """
     env_abs = np.abs(env)
     ref = float(np.max(env_abs)) if env_abs.size else 0.0
     if ref <= 0.0:
@@ -48,6 +71,22 @@ def _compute_linearity_metrics(
     t1: float,
     tx_db: float,
 ) -> tuple[float, float, float, float, int]:
+    """Compute linearity metrics against the Tx reference diagonal.
+
+    Args:
+        t: Time array in seconds.
+        y_db: Log-amplitude envelope in dB re max(env).
+        t0: Span start time in seconds.
+        t1: Span end time in seconds.
+        tx_db: Target dB drop over the span (e.g., 60 for T60).
+
+    Returns:
+        Tuple of (y0_data, y1_data, r2, rms_db, n_points).
+
+    Assumptions:
+        - Reference line is defined by y(t0) and tx_db drop at t1.
+        - Metrics use all finite samples within [t0, t1].
+    """
     if t1 <= t0:
         return np.nan, np.nan, np.nan, np.nan, 0
 
@@ -88,7 +127,25 @@ def compute_tx_span_measurement(
     fn_hz: float | None = None,
     config: TxSpanConfig | None = None,
 ) -> TxSpanMeasurement:
-    """Compute Tx span measurement and diagnostics."""
+    """Compute Tx span measurement and diagnostics.
+
+    Args:
+        t: Time array in seconds.
+        env: Envelope amplitude (linear scale).
+        t0: Span start time in seconds.
+        t1: Span end time in seconds.
+        tx_db: Target dB drop over the span (e.g., 10, 20, 30, 60).
+        fn_hz: Natural frequency in Hz (optional for zeta).
+        config: Threshold configuration for diagnostic flags.
+
+    Returns:
+        TxSpanMeasurement payload with Tx, slope, linearity metrics, and flags.
+
+    Assumptions:
+        - Uses log-amplitude 20*log10(|env|/max(env)).
+        - Tx is defined as t1 - t0 with slope = tx_db / (t1 - t0).
+        - zeta uses (slope_db_per_s * ln(10)) / (20 * 2*pi*fn_hz).
+    """
     if config is None:
         config = TxSpanConfig()
 
@@ -393,7 +450,18 @@ def run_tx_span_measurement_ui(
     tx_options_db: Iterable[float] | None = None,
     config: TxSpanConfig | None = None,
 ) -> TxSpanMeasurement | None:
-    """Run the interactive Tx span measurement UI."""
+    """Run the interactive Tx span measurement UI.
+
+    Args:
+        t: Time array in seconds.
+        env: Envelope amplitude (linear scale).
+        fn_hz: Natural frequency in Hz (optional for zeta).
+        tx_options_db: Candidate Tx drops in dB.
+        config: Threshold configuration for diagnostic flags.
+
+    Returns:
+        TxSpanMeasurement payload if committed, otherwise None.
+    """
     tx_list = (
         list(tx_options_db) if tx_options_db is not None else [10.0, 20.0, 30.0, 60.0]
     )

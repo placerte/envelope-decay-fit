@@ -19,14 +19,27 @@ from ..result import PieceRecord, Result
 
 @dataclass
 class ManualUIConfig:
-    """Configuration for the manual segmentation UI."""
+    """Configuration for the manual segmentation UI.
+
+    Attributes:
+        min_points: Minimum samples required per segment.
+        out_dir: Optional output directory for artifacts.
+    """
 
     min_points: int = 10
     out_dir: Path | None = None
 
 
 def find_nearest_index(t: np.ndarray, x_value: float) -> int:
-    """Find nearest index in a sorted time array."""
+    """Find the nearest sample index in a sorted time array.
+
+    Args:
+        t: Time array in seconds (strictly increasing).
+        x_value: Target time in seconds.
+
+    Returns:
+        Index of the closest sample in t.
+    """
     idx = int(np.searchsorted(t, x_value))
     if idx <= 0:
         return 0
@@ -43,7 +56,15 @@ def find_nearest_index(t: np.ndarray, x_value: float) -> int:
 def snap_boundary_times_to_indices(
     t: np.ndarray, boundaries_time_s: list[float]
 ) -> list[int]:
-    """Snap boundary times to nearest sample indices."""
+    """Snap boundary times to nearest sample indices.
+
+    Args:
+        t: Time array in seconds (strictly increasing).
+        boundaries_time_s: Boundary times in seconds.
+
+    Returns:
+        Sorted list of unique boundary indices.
+    """
     indices: list[int] = []
     for time_s in boundaries_time_s:
         idx = find_nearest_index(t, float(time_s))
@@ -58,7 +79,22 @@ def compute_manual_pieces(
     boundary_indices: list[int],
     min_points: int = 10,
 ) -> tuple[list[PieceRecord], list[FlagRecord]]:
-    """Compute piecewise fits using literal manual boundaries."""
+    """Compute piecewise fits using literal manual boundaries.
+
+    Args:
+        t: Time array in seconds.
+        env: Envelope amplitude (linear scale).
+        fn_hz: Natural frequency in Hz.
+        boundary_indices: Boundary indices into t/env.
+        min_points: Minimum samples required per piece.
+
+    Returns:
+        Tuple of (pieces, flags).
+
+    Assumptions:
+        - Each piece is modeled as exponential decay.
+        - Damping ratio uses zeta = alpha / (2*pi*fn_hz).
+    """
     flags: list[FlagRecord] = []
 
     if len(boundary_indices) < 2:
@@ -130,7 +166,19 @@ def build_result_from_manual(
     pieces: list[PieceRecord],
     flags: list[FlagRecord],
 ) -> Result:
-    """Build a Result object from manual segmentation outputs."""
+    """Build a Result object from manual segmentation outputs.
+
+    Args:
+        t: Time array in seconds.
+        env: Envelope amplitude (linear scale).
+        fn_hz: Natural frequency in Hz.
+        boundary_indices: Boundary indices into t/env.
+        pieces: PieceRecord list from manual fits.
+        flags: FlagRecord list describing data or fit issues.
+
+    Returns:
+        Result object populated with manual segmentation metadata.
+    """
     omega_n = 2.0 * np.pi * fn_hz
     boundary_indices = sorted(set(boundary_indices))
     boundary_times = [float(t[i]) for i in boundary_indices]
@@ -166,7 +214,15 @@ def _fit_result_to_dict(
 
 
 def write_manual_segmentation_json(result: Result, out_path: Path) -> Path:
-    """Write manual segmentation metadata and fit results to JSON."""
+    """Write manual segmentation metadata and fit results to JSON.
+
+    Args:
+        result: Result object from the manual workflow.
+        out_path: Output JSON path.
+
+    Returns:
+        Path to the written JSON file.
+    """
     data: dict[str, object] = {
         "manual_segmentation": {
             "enabled": bool(result.manual_segmentation_enabled),
@@ -663,7 +719,19 @@ def run_manual_segmentation(
     out_dir: Path | str | None = None,
     initial_boundaries_time_s: list[float] | None = None,
 ) -> Result | None:
-    """Run the interactive manual segmentation workflow."""
+    """Run the interactive manual segmentation workflow.
+
+    Args:
+        t: Time array in seconds.
+        env: Envelope amplitude (linear scale).
+        fn_hz: Natural frequency in Hz.
+        min_points: Minimum samples required per piece.
+        out_dir: Optional output directory for artifacts.
+        initial_boundaries_time_s: Optional initial boundaries in seconds.
+
+    Returns:
+        Result if committed, otherwise None.
+    """
     out_path = Path(out_dir) if out_dir is not None else None
     ui = ManualSegmentationUI(
         t=t,

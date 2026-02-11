@@ -18,7 +18,15 @@ LOGGER = logging.getLogger(__name__)
 
 @dataclass
 class AutoSegmentationConfig:
-    """Configuration for automatic piecewise segmentation."""
+    """Configuration for automatic piecewise segmentation.
+
+    Attributes:
+        n_pieces: Target number of pieces to extract.
+        max_windows: Maximum number of expanding windows to scan.
+        min_points: Minimum samples per window.
+        min_established_duration_s: Minimum duration for established decay (seconds).
+        min_established_points: Minimum samples for established decay.
+    """
 
     n_pieces: int = 2
     max_windows: int = 500

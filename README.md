@@ -32,6 +32,8 @@ Given a **time-domain envelope** `env(t)` (e.g. Hilbert envelope) and a known na
 
 * computes **multiple fits** per window (log-domain, linear w/ and w/o floor),
 
+* offers **span-based Tx measurement** (T10/T20/T30/T60) as a second method,
+
 * reports **all results**, plus quality metrics and flags.
 
 The philosophy is: **compute everything, report everything, decide later**.
@@ -207,15 +209,16 @@ You are free to use, modify, and embed this code in other projects.
 
 ## Status
 
-**Version 0.1.2** - Working prototype
+**Version 0.2.0** - Working prototype
 
 The package is functional and has been tested on real datasets. Key features:
 - ✅ Three fitting methods (LOG, LIN0, LINC)
 - ✅ Piecewise decay extraction with breakpoint detection
 - ✅ Diagnostic plots and flag system
 - ✅ CLI and programmatic API
+- ✅ Span-based Tx measurement (interactive, opt-in)
 
-### Known Limitations (v0.1.2)
+### Known Limitations (v0.2.0)
 
 1. **Window Sampling**: For performance, expanding windows are sampled (max 500 by default) rather than generating all possible windows. This is a pragmatic optimization that provides good results while keeping computation tractable for large datasets.
 
@@ -233,7 +236,7 @@ The package is functional and has been tested on real datasets. Key features:
 - Scales linearly with `max_windows` parameter
 - For very large datasets, consider downsampling or reducing `max_windows`
 
-### Future Work (v0.2.0+)
+### Future Work (v0.3.0+)
 
 - Implement tail trimming
 - Add CSV output writers
