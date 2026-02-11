@@ -275,23 +275,32 @@ class TxSpanUI:
     tx_index: int = 0
     measurement: TxSpanMeasurement | None = None
     committed: bool = False
+    display_mode: str = "db"
     env_line: Line2D | None = None
     span_selector: SpanSelector | None = None
     overlay_rect: Rectangle | None = None
     overlay_line: Line2D | None = None
+    _y_db: np.ndarray | None = None
+    _y_amp: np.ndarray | None = None
 
     def run(self) -> TxSpanMeasurement | None:
         """Launch the interactive session and return a measurement if committed."""
         import matplotlib.pyplot as plt
 
         self.fig, self.ax = plt.subplots(figsize=(12, 6))
-        y_db = _compute_log_envelope_db(self.env)
+        self._y_db = _compute_log_envelope_db(self.env)
+        self._y_amp = np.abs(self.env)
         self.env_line = self.ax.plot(
-            self.t, y_db, "k-", alpha=0.6, linewidth=1, label="Envelope (dB)"
+            self.t,
+            self._current_display_y(),
+            "k-",
+            alpha=0.6,
+            linewidth=1,
+            label=self._current_display_label(),
         )[0]
 
         self.ax.set_xlabel("Time (s)")
-        self.ax.set_ylabel("Envelope (dB re max)")
+        self.ax.set_ylabel(self._current_display_label())
         title = "Span-based Tx measurement"
         if self.fn_hz is not None:
             title = f"{title} (fn={self.fn_hz:.1f} Hz)"
@@ -345,6 +354,10 @@ class TxSpanUI:
             self._refresh_overlay()
             return
 
+        if key == "l":
+            self._toggle_display_mode()
+            return
+
         if key == "q":
             self.committed = True
             import matplotlib.pyplot as plt
@@ -358,6 +371,54 @@ class TxSpanUI:
         if not self.tx_options_db:
             return 60.0
         return float(self.tx_options_db[self.tx_index])
+
+    def _current_display_label(self) -> str:
+        if self.display_mode == "amp":
+            return "Envelope amplitude"
+        return "Envelope (dB re max)"
+
+    def _current_display_y(self) -> np.ndarray:
+        if self.display_mode == "amp":
+            if self._y_amp is None:
+                self._y_amp = np.abs(self.env)
+            return self._y_amp
+        if self._y_db is None:
+            self._y_db = _compute_log_envelope_db(self.env)
+        return self._y_db
+
+    def _set_display_ylim(self) -> None:
+        y_display = self._current_display_y()
+        finite_mask = np.isfinite(y_display)
+        if not finite_mask.any():
+            return
+
+        y_min = float(np.min(y_display[finite_mask]))
+        y_max = float(np.max(y_display[finite_mask]))
+        if self.display_mode == "amp":
+            y_min = max(0.0, y_min)
+
+        if y_max <= y_min:
+            y_max = y_min + 1.0
+
+        pad = 0.05 * (y_max - y_min)
+        lower = y_min - pad
+        upper = y_max + pad
+        if self.display_mode == "amp":
+            lower = max(0.0, lower)
+
+        self.ax.set_ylim(lower, upper)
+
+    def _toggle_display_mode(self) -> None:
+        self.display_mode = "amp" if self.display_mode == "db" else "db"
+        if self.env_line is not None:
+            y_display = self._current_display_y()
+            self.env_line.set_data(self.t, y_display)
+            self.env_line.set_label(self._current_display_label())
+        self.ax.set_ylabel(self._current_display_label())
+        self.ax.set_yscale("linear")
+        self._set_display_ylim()
+        self._refresh_overlay()
+        self.fig.canvas.draw_idle()
 
     def _refresh_overlay(self) -> None:
         if self.t0 is None or self.t1 is None:
@@ -374,8 +435,8 @@ class TxSpanUI:
             config=self.config,
         )
 
-        y_db = _compute_log_envelope_db(self.env)
-        finite_mask = np.isfinite(y_db)
+        y_display = self._current_display_y()
+        finite_mask = np.isfinite(y_display)
         if not finite_mask.any():
             return
 
@@ -383,18 +444,24 @@ class TxSpanUI:
         t1 = self.measurement.t1
         span_mask = (self.t >= t0) & (self.t <= t1) & finite_mask
         t_span = self.t[span_mask]
-        y_span = y_db[span_mask]
+        y_span = y_display[span_mask]
         if t_span.size == 0:
             return
 
         y0 = float(np.interp(t0, t_span, y_span))
-        y1 = y0 - tx_db
+        if self.display_mode == "amp":
+            ratio = 10.0 ** (-tx_db / 20.0)
+            y1 = y0 * ratio
+            rect_height = y0 - y1
+        else:
+            y1 = y0 - tx_db
+            rect_height = tx_db
 
         if self.overlay_rect is None:
             self.overlay_rect = Rectangle(
                 (t0, y1),
                 t1 - t0,
-                tx_db,
+                rect_height,
                 facecolor="tab:orange",
                 edgecolor="tab:orange",
                 alpha=0.2,
@@ -405,18 +472,36 @@ class TxSpanUI:
             self.overlay_rect.set_x(t0)
             self.overlay_rect.set_y(y1)
             self.overlay_rect.set_width(t1 - t0)
-            self.overlay_rect.set_height(tx_db)
+            self.overlay_rect.set_height(rect_height)
 
-        if self.overlay_line is None:
-            self.overlay_line = Line2D(
-                [t0, t1],
-                [y0, y1],
-                color="tab:orange",
-                linewidth=2,
-            )
-            self.ax.add_line(self.overlay_line)
+        if self.display_mode == "amp":
+            t_line = np.linspace(t0, t1, 100)
+            span_dt = t1 - t0
+            if span_dt <= 0.0:
+                return
+            slope_db_per_s = tx_db / span_dt
+            y_line = y0 * 10.0 ** (-(slope_db_per_s * (t_line - t0)) / 20.0)
+            if self.overlay_line is None:
+                self.overlay_line = Line2D(
+                    t_line,
+                    y_line,
+                    color="tab:orange",
+                    linewidth=2,
+                )
+                self.ax.add_line(self.overlay_line)
+            else:
+                self.overlay_line.set_data(t_line, y_line)
         else:
-            self.overlay_line.set_data([t0, t1], [y0, y1])
+            if self.overlay_line is None:
+                self.overlay_line = Line2D(
+                    [t0, t1],
+                    [y0, y1],
+                    color="tab:orange",
+                    linewidth=2,
+                )
+                self.ax.add_line(self.overlay_line)
+            else:
+                self.overlay_line.set_data([t0, t1], [y0, y1])
 
         self._update_info_text(self.measurement)
         self.fig.canvas.draw_idle()
@@ -436,7 +521,7 @@ class TxSpanUI:
                 f"R2: {measurement.linearity_r2:.4f}",
                 f"RMS: {measurement.linearity_rms_db:.3f} dB",
                 f"flags: {flags_text}",
-                "t: cycle Tx | q: commit",
+                "t: cycle Tx | l: toggle display | q: commit",
             ]
         )
         self.info_text.set_text("\n".join(lines))
